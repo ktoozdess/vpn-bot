@@ -9,6 +9,8 @@ services:
       - .env
     depends_on:
       - 3x-ui
+    volumes:
+      - /root/vpn-bot/users.json:/app/users.json
 
   3x-ui:
     image: ghcr.io/mhsanaei/3x-ui:latest
