@@ -1,0 +1,101 @@
+import { Telegraf, Context } from 'telegraf';
+import dotenv from 'dotenv';
+import { XUIClient, XUIConfig } from './xui.js';
+
+// Load environment variables
+dotenv.config();
+
+// Validate required environment variables
+const requiredEnvVars = [
+  'TELEGRAM_BOT_TOKEN',
+  'XUI_BASE_URL',
+  'XUI_USERNAME',
+  'XUI_PASSWORD',
+];
+
+for (const envVar of requiredEnvVars) {
+  if (!process.env[envVar]) {
+    throw new Error(`Missing required environment variable: ${envVar}`);
+  }
+}
+
+// Initialize Telegram bot
+const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN!);
+
+// Initialize 3X-UI client
+const xuiConfig: XUIConfig = {
+  baseURL: process.env.XUI_BASE_URL!,
+  username: process.env.XUI_USERNAME!,
+  password: process.env.XUI_PASSWORD!,
+};
+
+const xuiClient = new XUIClient(xuiConfig);
+
+// /start command handler
+bot.command('start', async (ctx: Context) => {
+  try {
+    // Log into 3X-UI
+    const loggedIn = await xuiClient.login();
+    if (!loggedIn) {
+      await ctx.reply('❌ Failed to connect to 3X-UI');
+      return;
+    }
+
+    // Call /panel/api/inbounds/list
+    await xuiClient.getInbounds();
+
+    // Success response
+    await ctx.reply('✅ Connected to 3X-UI successfully');
+  } catch (error) {
+    console.error('Error in /start command:', error);
+    await ctx.reply('❌ Failed to connect to 3X-UI');
+  }
+});
+
+// Error handling
+bot.catch((err, ctx) => {
+  console.error('Error in bot:', err);
+  ctx.reply('An error occurred. Please try again later.');
+});
+
+// Start bot
+bot.launch().then(() => {
+  console.log('Bot started successfully');
+}).catch((error) => {
+  console.error('Failed to start bot:', error);
+  process.exit(1);
+});
+
+// Graceful shutdown
+process.once('SIGINT', () => {
+  bot.stop('SIGINT');
+  xuiClient.logout().finally(() => {
+    process.exit(0);
+  });
+});
+
+process.once('SIGTERM', () => {
+  bot.stop('SIGTERM');
+  xuiClient.logout().finally(() => {
+    process.exit(0);
+  });
+});
+
+
+
+
+admin@ip-192-168-212-117 ~ % docker run -d \
+  --name 3x-ui \
+  -p 2053:2053 \
+  -p 443:443 \
+  -p 80:80 \
+  ghcr.io/mhsanaei/3x-ui:latest
+
+
+
+  http://192.168.212.117:2053
+
+
+vps
+  root 
+  Minibaev2405!!
