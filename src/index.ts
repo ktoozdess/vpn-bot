@@ -127,7 +127,12 @@ bot.command('get', async (ctx) => {
       return;
     }
 
-    ctx.reply(`🔗 Connection link for "${name}":\n${inbound.tag} - vless://UUID@host:${inbound.port}?...`);
+    const baseUrl = new URL(process.env.XUI_BASE_URL!);
+    const host = baseUrl.hostname;
+    const uuid = inbound.client?.uuid || 'MISSING_UUID';
+    const url = `vless://${uuid}@${host}:${inbound.port}?encryption=none&security=tls&type=tcp#${name}`;
+
+    ctx.reply(`🔗 Connection link for "${name}":\n${url}`);
   } catch (e) {
     console.error(e);
     ctx.reply('Failed to fetch VPN info.');

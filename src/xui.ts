@@ -22,6 +22,9 @@ export interface Inbound {
   total: number;
   expiryTime: number;
   listen: string;
+  client?: {
+    uuid: string;
+  };
   [key: string]: unknown;
 }
 
