@@ -13,167 +13,135 @@ export interface Inbound {
   port: number;
   protocol: string;
   settings: string;
-  streamSettings: string;
   tag: string;
-  sniffing: string;
   remark: string;
   up: number;
   down: number;
   total: number;
   expiryTime: number;
-  listen: string;
-  client?: {
-    uuid: string;
-  };
-  [key: string]: unknown;
+  [key: string]: any;
 }
 
-export interface InboundsListResponse {
-  success: boolean;
-  obj: Inbound[];
-}
-
-/**
- * 3X-UI API Client with session-based authentication
- */
 export class XUIClient {
-  private axiosInstance: AxiosInstance;
-  private config: XUIConfig;
+  public readonly axiosInstance: AxiosInstance;
   private cookieJar: CookieJar;
   private isAuthenticated: boolean = false;
 
-  constructor(config: XUIConfig) {
-    this.config = config;
+  constructor(private config: XUIConfig) {
     this.cookieJar = new CookieJar();
-    
-    // Create axios instance
-    const axiosInstance = axios.create({
+    const instance = axios.create({
       baseURL: config.baseURL,
       withCredentials: true,
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
     });
-    
-    // Wrap axios instance with cookie jar support
-    // The wrapper adds an interceptor that uses config.jar for each request
-    this.axiosInstance = wrapper(axiosInstance) as AxiosInstance;
-    
-    // Set default jar for all requests
-    (this.axiosInstance.defaults as unknown as { jar?: CookieJar }).jar = this.cookieJar;
+    this.axiosInstance = wrapper(instance) as AxiosInstance;
+    (this.axiosInstance.defaults as any).jar = this.cookieJar;
   }
 
-  /**
-   * Login to 3X-UI and establish session
-   */
   async login(): Promise<boolean> {
     try {
-      // Clear existing cookies before login
       this.cookieJar.removeAllCookies();
-      this.isAuthenticated = false;
-
-      const response: AxiosResponse = await this.axiosInstance.post(
-        '/login',
-        {
-          username: this.config.username,
-          password: this.config.password,
-        }
-      );
-
-      // Check if login was successful
-      // 3X-UI typically returns success: true or a redirect
-      if (response.status === 200) {
-        // Check if cookies were set (cookie jar handles this automatically)
-        const cookies = await this.cookieJar.getCookies(this.config.baseURL);
-        if (cookies.length > 0) {
-          // Cookies are stored in jar, authentication successful
-          this.isAuthenticated = true;
-          return true;
-        }
-        // Some 3X-UI versions return success in body
-        if (response.data?.success === true) {
-          this.isAuthenticated = true;
-          return true;
-        }
-      }
-
-      return false;
-    } catch (error) {
-      console.error('Login error:', error);
-      this.isAuthenticated = false;
+      const response = await this.axiosInstance.post('/login', {
+        username: this.config.username,
+        password: this.config.password,
+      });
+      this.isAuthenticated = response.status === 200;
+      return this.isAuthenticated;
+    } catch {
       return false;
     }
   }
 
-  /**
-   * Get list of inbounds
-   */
   async getInbounds(): Promise<Inbound[]> {
-    if (!this.isAuthenticated) {
-      const loggedIn = await this.login();
-      if (!loggedIn) {
-        throw new Error('Not authenticated. Login failed.');
-      }
-    }
-
-    try {
-      const response: AxiosResponse<InboundsListResponse> =
-        await this.axiosInstance.get('/panel/api/inbounds/list');
-
-      if (response.data?.success && Array.isArray(response.data.obj)) {
-        return response.data.obj;
-      }
-
-      // If response structure is different, try to return the data directly
-      if (Array.isArray(response.data)) {
-        return response.data;
-      }
-
-      throw new Error('Invalid response format from inbounds/list');
-    } catch (error) {
-      // If we get 401/403, try to re-authenticate once
-      if (
-        axios.isAxiosError(error) &&
-        (error.response?.status === 401 || error.response?.status === 403)
-      ) {
-        this.isAuthenticated = false;
-        const loggedIn = await this.login();
-        if (loggedIn) {
-          // Retry the request
-          const response: AxiosResponse<InboundsListResponse> =
-            await this.axiosInstance.get('/panel/api/inbounds/list');
-          if (response.data?.success && Array.isArray(response.data.obj)) {
-            return response.data.obj;
-          }
-          if (Array.isArray(response.data)) {
-            return response.data;
-          }
-        }
-      }
-
-      throw error;
-    }
+    if (!this.isAuthenticated) await this.login();
+    const response = await this.axiosInstance.get('/panel/api/inbounds/list');
+    return response.data.obj || [];
   }
 
-  /**
-   * Check if client is authenticated
-   */
-  isLoggedIn(): boolean {
-    return this.isAuthenticated;
+  async findUserByTelegramId(tgId: number): Promise<{ inbound: Inbound; client: any } | null> {
+    const inbounds = await this.getInbounds();
+    for (const inbound of inbounds) {
+      try {
+        const settings = JSON.parse(inbound.settings);
+        const client = settings.clients.find((c: any) => c.tgId === tgId || c.email === `tg_${tgId}`);
+        if (client) return { inbound, client };
+      } catch { continue; }
+    }
+    return null;
   }
 
-  /**
-   * Logout and clear session
-   */
-  async logout(): Promise<void> {
-    try {
-      await this.axiosInstance.post('/panel/api/logout');
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      // Clear all cookies
-      this.cookieJar.removeAllCookies();
-      this.isAuthenticated = false;
+  async createUser(inboundId: number, tgId: number, days: number): Promise<string> {
+    const uuid = this.generateUUID();
+    const expiryTimestamp = Date.now() + days * 24 * 60 * 60 * 1000;
+    
+    // ВАЖНО: 3X-UI требует объект клиента внутри JSON строки в поле settings
+    const clientData = {
+      id: uuid,
+      email: `tg_${tgId}`,
+      limitIp: 1,
+      totalGB: 0,
+      expiryTime: expiryTimestamp,
+      enable: true,
+      tgId: tgId,
+      subId: this.generateUUID().substring(0, 8),
+      flow: ""
+    };
+
+    const response = await this.axiosInstance.post('/panel/api/inbounds/addClient', {
+      id: inboundId,
+      settings: JSON.stringify({ clients: [clientData] })
+    });
+
+    if (!response.data.success) {
+      throw new Error(response.data.msg || 'Failed to add client');
     }
+
+    return uuid;
+  }
+
+  async getClientStats(email: string): Promise<{ up: number, down: number } | null> {
+    if (!this.isAuthenticated) await this.login();
+    // В 3X-UI статистика берется через этот эндпоинт
+    const response = await this.axiosInstance.get(`/panel/api/inbounds/getClientTraffics/${email}`);
+    if (response.data.success && response.data.obj) {
+      return {
+        up: response.data.obj.up,
+        down: response.data.obj.down
+      };
+    }
+    return null;
+  }
+
+  async updateUserExpiry(inboundId: number, clientUuid: string, tgId: number, days: number): Promise<void> {
+    const user = await this.findUserByTelegramId(tgId);
+    let baseTime = Date.now();
+    
+    if (user && user.client.expiryTime > baseTime) {
+      baseTime = user.client.expiryTime;
+    }
+
+    const newExpiry = baseTime + days * 24 * 60 * 60 * 1000;
+
+    const clientData = {
+      id: clientUuid,
+      email: `tg_${tgId}`,
+      expiryTime: newExpiry,
+      enable: true,
+      tgId: tgId
+    };
+
+    const response = await this.axiosInstance.post(`/panel/api/inbounds/updateClient/${clientUuid}`, {
+      id: inboundId,
+      settings: JSON.stringify({ clients: [clientData] })
+    });
+
+    if (!response.data.success) throw new Error(response.data.msg);
+  }
+
+  private generateUUID(): string {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
   }
 }
