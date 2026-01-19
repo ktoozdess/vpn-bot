@@ -101,7 +101,6 @@ export class XUIClient {
 
   async getClientStats(email: string): Promise<{ up: number, down: number } | null> {
     if (!this.isAuthenticated) await this.login();
-    // В 3X-UI статистика берется через этот эндпоинт
     const response = await this.axiosInstance.get(`/panel/api/inbounds/getClientTraffics/${email}`);
     if (response.data.success && response.data.obj) {
       return {
