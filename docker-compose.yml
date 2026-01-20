@@ -20,5 +20,6 @@ services:
       - "2053:2053"
       - "443:443"
       - "80:80"
+      - "30001:30001"
     volumes:
       - /root/3xui/data:/etc/x-ui
