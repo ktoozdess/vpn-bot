@@ -11,19 +11,34 @@ const xuiClient = new XUIClient({
   password: process.env.XUI_PASSWORD!,
 });
 
-
 const replyKeyboard = Markup.keyboard([
   ['📊 My Status', '🔗 Get VPN Link'],
-  ['💳 Subscription Info', '❓ How to start use']
+  ['💳 Subscription Info', '❓ How to start use'],
+  ['ℹ️ About Us'] // Новый ряд для одной кнопки
 ]).resize();
 
+bot.hears('ℹ️ About Us', async (ctx) => {
+  const aboutText = 
+     `<b>Tiina VPN - Security made simple</b>\n\n` +
+    `<b>About Our Service</b>\n\n` +
+    `🚀 <b>High Speed:</b> We use modern protocols (VLESS) to ensure maximum performance.\n` +
+    `🛡 <b>Privacy:</b> We do not log your activity. Your data is secure.\n` +
+    `🌍 <b>Global Access:</b> Bypass restrictions and access any content worldwide.\n\n` +
+    `<i>Thank you for choosing us!</i>`;
+
+  await ctx.reply(aboutText, { 
+    parse_mode: 'HTML',
+    // // Опционально: можно добавить кнопку со ссылкой на канал с новостями
+    // ...Markup.inlineKeyboard([
+    //   [Markup.button.url('📢 Our Channel', 'https://t.me/your_channel_link')]
+    // ])
+  });
+});
 
 const PLANS = {
   TRIAL: { days: 10, label: '🎁 Free Trial (10 days)', price: 'Free' },
   MONTHLY: { days: 30, label: '🗓 1 Month Plan', price: '3 USDT / 299 RUB' }
 };
-
-// --- ОБНОВЛЕННЫЕ КЛАВИАТУРЫ ---
 
 const subscribeKeyboard = Markup.inlineKeyboard([
   [Markup.button.callback(PLANS.TRIAL.label, 'buy_trial')],

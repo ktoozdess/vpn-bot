@@ -21,4 +21,4 @@ services:
       - "443:443"
       - "80:80"
     volumes:
-      - /root/3xui/data:/app/data
+      - /root/3xui/data:/etc/x-ui
