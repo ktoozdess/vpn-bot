@@ -2,6 +2,10 @@ import { Telegraf, Markup, Context } from 'telegraf';
 import dotenv from 'dotenv';
 import { XUIClient } from './xui.js';
 
+import fs from 'fs';
+
+const USERS_FILE = './users.json';
+
 dotenv.config();
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN!);
@@ -137,29 +141,6 @@ bot.on('successful_payment', async (ctx) => {
   }
 });
 
-// --- ОБНОВЛЕННАЯ КОМАНДА SUBSCRIBE (для ручного ввода админом) ---
-bot.command('subscribe', async (ctx) => {
-  // Проверяем, является ли отправитель админом (опционально)
-  const args = ctx.message.text.split(' ');
-  const days = parseInt(args[1]);
-  
-  if (!days) return ctx.reply('Usage: /subscribe <days>');
-
-  try {
-    const tgId = ctx.from.id;
-    const existing = await xuiClient.findUserByTelegramId(tgId);
-    
-    if (existing) {
-      await xuiClient.updateUserExpiry(existing.inbound.id, existing.client.id, tgId, days);
-      return ctx.reply(`✅ Subscription extended by ${days} days.`);
-    }
-    // ... логика создания нового пользователя (как в старом коде)
-  } catch (e: any) {
-    ctx.reply(`❌ Error: ${escapeMarkdown(e.message)}`);
-  }
-});
-
-
 // --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ (LOGIC) ---
 
 const formatTraffic = (bytes: number) => {
@@ -177,7 +158,7 @@ const escapeMarkdown = (text: string) => {
 // Функция получения инфо (общая для команды и кнопки)
 async function getUserInfo(tgId: number) {
   const user = await xuiClient.findUserByTelegramId(tgId);
-  if (!user) return { error: '❌ You do not have an active subscription. Use /subscribe' };
+  if (!user) return { error: '❌ You do not have an active subscription.' };
 
   const { client } = user;
   const now = Date.now();
@@ -196,7 +177,7 @@ async function getUserInfo(tgId: number) {
     `📅 Expires: <code>${expiryDate}</code>\n` +
     `🔼 Uploaded: <code>${formatTraffic(stats?.up || 0)}</code>\n` +
     `🔽 Downloaded: <code>${formatTraffic(stats?.down || 0)}</code>\n\n` +
-    `<i>To extend, use /subscribe [days]</i>`;
+    `<i>To extend, use 💳 Subscription Info</i>`;
 
   return { text };
 }
@@ -226,8 +207,32 @@ async function getConnectionLink(tgId: number) {
 
 // --- КОМАНДЫ ---
 
+// Функция для получения списка всех ID
+function getAllUsers(): number[] {
+  try {
+    if (!fs.existsSync(USERS_FILE)) return [];
+    const data = fs.readFileSync(USERS_FILE, 'utf-8');
+    return JSON.parse(data || '[]');
+  } catch (e) {
+    console.error('Error reading users file:', e);
+    return [];
+  }
+}
+
+// Функция сохранения (с проверкой)
+function saveUser(id: number) {
+  const users = getAllUsers();
+  if (!users.includes(id)) {
+    users.push(id);
+    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+    console.log(`Saved new user: ${id}`);
+  }
+}
+
 bot.command('start', async (ctx) => {
   await xuiClient.login();
+
+  saveUser(ctx.from.id)
   
   const welcomeText = 
     `👋 <b>Welcome!</b>\n\n` +
@@ -241,6 +246,62 @@ bot.command('start', async (ctx) => {
   });
 });
 
+const ADMIN_ID = 680365861; // Your ID
+
+bot.command('all', async (ctx) => {
+  // Check for admin rights
+  if (ctx.from.id !== ADMIN_ID) return;
+
+  const args = ctx.message.text.split(' ');
+  const replyTo = ctx.message.reply_to_message;
+  const users = getAllUsers();
+
+  if (users.length === 0) {
+    return ctx.reply('❌ User list is empty.');
+  }
+
+  // Determine what we are sending
+  const broadcastText = args.slice(1).join(' ');
+  
+  if (!replyTo && !broadcastText) {
+    return ctx.reply('Usage:\n1. `/all Hello world` - send text\n2. Reply to any message with `/all` - copy that message', { parse_mode: 'Markdown' });
+  }
+
+  await ctx.reply(`🚀 Starting broadcast to ${users.length} users...`);
+
+  let count = 0;
+  let blockedCount = 0;
+
+  for (const userId of users) {
+    try {
+      if (replyTo) {
+        // Copies any message type (photo, video, document, etc.)
+        await ctx.telegram.copyMessage(userId, ctx.chat.id, replyTo.message_id);
+      } else {
+        // Sends plain text
+        await ctx.telegram.sendMessage(userId, broadcastText, { parse_mode: 'HTML' });
+      }
+      count++;
+
+      // Anti-flood delay (approx 30 messages per second)
+      await new Promise(res => setTimeout(res, 35));
+    } catch (e: any) {
+      // Common error: user blocked the bot
+      if (e.description === 'Forbidden: bot was blocked by the user') {
+        blockedCount++;
+      }
+      console.log(`Failed to send message to ${userId}: ${e.message}`);
+    }
+  }
+
+  await ctx.reply(
+    `✅ <b>Broadcast completed!</b>\n\n` +
+    `Доставлено: <code>${count}</code>\n` +
+    `Blocked/Failed: <code>${blockedCount}</code>`,
+    { parse_mode: 'HTML' }
+  );
+});
+
 bot.command('info', async (ctx) => {
   const res = await getUserInfo(ctx.from.id);
   await ctx.reply(res.text || res.error!, { parse_mode: 'HTML' });
@@ -249,29 +310,6 @@ bot.command('info', async (ctx) => {
 bot.command('get', async (ctx) => {
   const res = await getConnectionLink(ctx.from.id);
   await ctx.reply(res.text || res.error!, { parse_mode: 'HTML' });
-});
-
-bot.command('subscribe', async (ctx) => {
-  const days = parseInt(ctx.message.text.split(' ')[1]);
-  if (!days) return ctx.reply('Usage: /subscribe <days>\nExample: `/subscribe 30`', { parse_mode: 'Markdown' });
-
-  try {
-    const tgId = ctx.from.id;
-    const existing = await xuiClient.findUserByTelegramId(tgId);
-    
-    if (existing) {
-      await xuiClient.updateUserExpiry(existing.inbound.id, existing.client.id, tgId, days);
-      return ctx.reply(`✅ Subscription extended by ${days} days.`);
-    }
-
-    const inbounds = await xuiClient.getInbounds();
-    if (!inbounds.length) return ctx.reply('❌ Server error: No inbounds.');
-
-    const uuid = await xuiClient.createUser(inbounds[0].id, tgId, days);
-    await ctx.reply(`✅ Subscribed\\! Your ID:\n\`${uuid}\``, { parse_mode: 'MarkdownV2' });
-  } catch (e: any) {
-    ctx.reply(`❌ Error: ${escapeMarkdown(e.message)}`);
-  }
 });
 
 // --- ОБРАБОТКА КНОПОК (ACTIONS) ---
@@ -299,17 +337,6 @@ bot.hears('🔗 Get VPN Link', async (ctx) => {
 
     ])
   });
-});
-
-// Кнопка Информации о подписке
-bot.hears('💳 Subscription Info', async (ctx) => {
-  const infoText = 
-    `💳 <b>How to subscribe:</b>\n\n` +
-    `Use the command <code>/subscribe [days]</code> to get access.\n` +
-    `Example: <code>/subscribe 30</code> for a 1-month plan.\n\n` +
-    `<i>Accepted automatically via the bot system.</i>`;
-  
-  await ctx.reply(infoText, { parse_mode: 'HTML' });
 });
 
 bot.hears('❓ How to start use', async (ctx) => {
@@ -345,10 +372,8 @@ async function sendHelp(ctx: Context) {
   });
 }
 
-// --- ЗАПУСК ---
-
 bot.launch();
-console.log('🚀 Bot is running with menus...');
+console.log('🚀 Bot is running...');
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
