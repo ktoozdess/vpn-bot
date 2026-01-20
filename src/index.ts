@@ -89,13 +89,52 @@ bot.action('buy_trial', async (ctx) => {
 bot.action('buy_monthly', async (ctx) => {
   await ctx.answerCbQuery();
   
-  const paymentText = 
-    `💎 <b>Monthly Subscription</b>\n\n` +
-    `Price: <b>${PLANS.MONTHLY.price}</b>\n\n` +
-    `To pay, please contact our administrator: @your_admin_handle\n` +
-    `<i>(Or you can integrate an automatic payment system here later)</i>`;
+  const priceInStars = 1; // Укажите цену в звездах
+
+  await ctx.replyWithInvoice({
+    title: 'Tiina VPN: 1 Month',
+    description: 'Subscription for 30 days of high-speed VLESS VPN access.',
+    payload: 'month_subscription', // Технический идентификатор
+    provider_token: '', // Для Stars всегда пустая строка
+    currency: 'XTR',
+    prices: [{ label: '1 Month Subscription', amount: priceInStars }],
+  });
+});
+
+bot.on('pre_checkout_query', async (ctx) => {
+  // Здесь можно еще раз проверить наличие свободных мест на сервере
+  await ctx.answerPreCheckoutQuery(true);
+});
+
+// 2. Действие после успешной оплаты
+bot.on('successful_payment', async (ctx) => {
+  const tgId = ctx.from.id;
+  const days = PLANS.MONTHLY.days;
+
+  try {
+    const existing = await xuiClient.findUserByTelegramId(tgId);
     
-  await ctx.reply(paymentText, { parse_mode: 'HTML' });
+    if (existing) {
+      // Если пользователь уже есть, продлеваем
+      await xuiClient.updateUserExpiry(existing.inbound.id, existing.client.id, tgId, days);
+    } else {
+      // Если новый пользователь, создаем его
+      const inbounds = await xuiClient.getInbounds();
+      if (inbounds.length > 0) {
+        await xuiClient.createUser(inbounds[0].id, tgId, days);
+      }
+    }
+
+    await ctx.reply(
+      `🎉 <b>Payment successful!</b>\n` +
+      `Your subscription has been extended by ${days} days.\n\n` +
+      `Tap "🔗 Get VPN Link" to get your config.`,
+      { parse_mode: 'HTML' }
+    );
+  } catch (e) {
+    console.error('Error after payment:', e);
+    await ctx.reply('❌ Payment received, but there was an error updating your subscription. Please contact @your_admin_handle');
+  }
 });
 
 // --- ОБНОВЛЕННАЯ КОМАНДА SUBSCRIBE (для ручного ввода админом) ---
@@ -175,7 +214,7 @@ async function getConnectionLink(tgId: number) {
   const baseUrl = new URL(process.env.XUI_BASE_URL!);
   const host = baseUrl.hostname;
   const inboundName = encodeURIComponent(inbound.remark || inbound.tag || 'XUI_VPN');
-  const link = `vless://${client.id}@${host}:${inbound.port}?encryption=none&security=tls&type=tcp#${inboundName}`;
+  const link = `vless://${client.id}@${host}:${inbound.port}?encryption=none&security=none&type=tcp#${inboundName}`;
 
   const text = 
     `🔗 <b>Your connection link:</b>\n\n` +
