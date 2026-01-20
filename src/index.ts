@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import { XUIClient } from './xui.js';
 
 import fs from 'fs';
+import { getUserLocale, labels, strings } from './i18n.js';
 
 const USERS_FILE = './users.json';
 
@@ -15,13 +16,18 @@ const xuiClient = new XUIClient({
   password: process.env.XUI_PASSWORD!,
 });
 
-const replyKeyboard = Markup.keyboard([
-  ['📊 My Status', '🔗 Get VPN Link'],
-  ['💳 Subscription Info', '❓ How to start use'],
-  ['ℹ️ About Us'] // Новый ряд для одной кнопки
-]).resize();
+const getReplyKeyboard = (ctx: any) => {
+  const lang = ctx.from?.language_code === 'ru' ? 'ru' : 'en';
+  const l = labels[lang];
 
-bot.hears('ℹ️ About Us', async (ctx) => {
+  return Markup.keyboard([
+    [l.status, l.link],
+    [l.info, l.help],
+    [l.about]
+  ]).resize();
+};
+
+bot.hears([labels.ru.about, labels.en.about], async (ctx) => {
   const aboutText = 
      `<b>Tiina VPN - Security made simple</b>\n\n` +
     `<b>About Our Service</b>\n\n` +
@@ -50,7 +56,7 @@ const subscribeKeyboard = Markup.inlineKeyboard([
 ]);
 
 // Кнопка Информации о подписке (вызывает меню выбора)
-bot.hears('💳 Subscription Info', async (ctx) => {
+bot.hears([labels.ru.info, labels.en.info], async (ctx) => {
   const text = 
     `💳 <b>Subscription Plans:</b>\n\n` +
     `• <b>Trial:</b> 10 days (Available once per user)\n` +
@@ -232,21 +238,17 @@ function saveUser(id: number) {
 bot.command('start', async (ctx) => {
   await xuiClient.login();
 
-  saveUser(ctx.from.id)
-  
-  const welcomeText = 
-    `👋 <b>Welcome!</b>\n\n` +
-    `We provide VPN keys for fast and secure access using the <b>VLESS</b> protocol. ` +
-    `Simply paste the key into your VPN application.\n\n` +
-    `📍 The menu is located in your keyboard (☰) — select a section below or get your VPN link instantly.`;
+  const locale = getUserLocale(ctx)
 
-  await ctx.reply(welcomeText, {
+  saveUser(ctx.from.id)
+
+  await ctx.reply(strings[locale].welcome, {
     parse_mode: 'HTML',
-    ...replyKeyboard
+    reply_markup: getReplyKeyboard(ctx).reply_markup
   });
 });
 
-const ADMIN_ID = 680365861; // Your ID
+const ADMIN_ID = 680365861; // ADMIN_ID
 
 bot.command('all', async (ctx) => {
   // Check for admin rights
@@ -315,13 +317,13 @@ bot.command('get', async (ctx) => {
 // --- ОБРАБОТКА КНОПОК (ACTIONS) ---
 
 // Кнопка Статуса
-bot.hears('📊 My Status', async (ctx) => {
+bot.hears([labels.ru.status, labels.en.status], async (ctx) => {
   const res = await getUserInfo(ctx.from.id);
   await ctx.reply(res.text || res.error!, { parse_mode: 'HTML' });
 });
 
 // Кнопка Ссылки
-bot.hears('🔗 Get VPN Link', async (ctx) => {
+bot.hears([labels.ru.link, labels.en.link], async (ctx) => {
   const res = await getConnectionLink(ctx.from.id);
   
   // Если произошла ошибка (например, нет подписки), просто выводим текст ошибки
@@ -339,7 +341,7 @@ bot.hears('🔗 Get VPN Link', async (ctx) => {
   });
 });
 
-bot.hears('❓ How to start use', async (ctx) => {
+bot.hears([labels.ru.help, labels.en.help], async (ctx) => {
   await sendHelp(ctx);
 });
 
