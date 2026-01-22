@@ -1,23 +1,23 @@
 version: "3.9"
 
 services:
-  vpn-bot:
-    build: .
-    container_name: vpn-bot
-    restart: unless-stopped
-    env_file:
-      - .env
-    depends_on:
-      - 3x-ui
-    volumes:
-      - /root/vpn-bot/users.json:/app/users.json
+    vpn-bot:
+        build: .
+        container_name: vpn-bot
+        restart: unless-stopped
+        env_file:
+            - .env
+        depends_on:
+            - 3x-ui
+        volumes:
+            - /root/vpn-bot/users.json:/app/users.json
 
-  3x-ui:
-    image: ghcr.io/mhsanaei/3x-ui:latest
-    container_name: 3x-ui
-    restart: unless-stopped
-    ports:
-      - "2053:2053"
-      - "30001:30001"
-    volumes:
-      - /root/3xui/data:/etc/x-ui
+    3x-ui:
+        image: ghcr.io/mhsanaei/3x-ui:latest
+        container_name: 3x-ui
+        restart: unless-stopped
+        ports:
+            - "2053:2053"
+            - "30001:30001"
+        volumes:
+            - /root/3xui/data:/etc/x-ui
