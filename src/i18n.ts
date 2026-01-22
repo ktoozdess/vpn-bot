@@ -61,6 +61,24 @@ export const strings = {
             `🔼 Отправлено: <code>${up}</code>\n` +
             `🔽 Загружено: <code>${down}</code>\n\n` +
             `<i>Для продления используйте 💳 О подписке</i>`,
+        noSubFound: "❌ Подписка не найдена. Используйте /subscribe",
+        subExpired: "❌ Срок вашей подписки истек.",
+        connectionLinkHeader:
+            `🔗 <b>Ваша ссылка для подключения:</b>\n\n` +
+            `<code>{link}</code>\n\n` +
+            `<i>Нажмите на ссылку выше, чтобы скопировать её.</i>`,
+        helpText:
+            `<b>Как начать пользоваться:</b>\n\n` +
+            `1️⃣ <b>Установите приложение (Happ Proxy):</b>\n` +
+            `• <a href="https://play.google.com/store/apps/details?id=com.happproxy">Скачать для Android</a>\n` +
+            `• <a href="https://apps.apple.com/ru/app/happ-proxy-utility-plus/id6746188973">Скачать для iOS (Россия)</a>\n` +
+            `• <a href="https://apps.apple.com/us/app/happ-proxy-utility/id6504287215">Скачать для iOS (Весь мир)</a>\n\n` +
+            `2️⃣ <b>Получите ссылку:</b>\n` +
+            `Нажмите кнопку "🔗 Ссылка VPN" в этом боте и скопируйте её.\n\n` +
+            `3️⃣ <b>Подключитесь:</b>\n` +
+            `Откройте приложение, добавьте конфигурацию (обычно через иконку "+" или "Import from Clipboard") и нажмите "Connect".\n\n` +
+            `🤝 <b>Поддержка:</b>\n` +
+            `Если у вас остались вопросы, напишите <a href="https://t.me/${adminUsername}">администратору</a>.`,
     },
     en: {
         welcome:
@@ -104,6 +122,24 @@ export const strings = {
             `🔼 Uploaded: <code>${up}</code>\n` +
             `🔽 Downloaded: <code>${down}</code>\n\n` +
             `<i>To extend, use 💳 Subscription Info</i>`,
+        noSubFound: "❌ Subscription not found. Use /subscribe",
+        subExpired: "❌ Your subscription has expired.",
+        connectionLinkHeader:
+            `🔗 <b>Your connection link:</b>\n\n` +
+            `<code>{link}</code>\n\n` +
+            `<i>Tap the link above to copy it.</i>`,
+        helpText:
+            `<b>How to get started:</b>\n\n` +
+            `1️⃣ <b>Install the app (Happ Proxy):</b>\n` +
+            `• <a href="https://play.google.com/store/apps/details?id=com.happproxy">Download for Android</a>\n` +
+            `• <a href="https://apps.apple.com/ru/app/happ-proxy-utility-plus/id6746188973">Download for iOS (Russia)</a>\n` +
+            `• <a href="https://apps.apple.com/us/app/happ-proxy-utility/id6504287215">Download for iOS (Global)</a>\n\n` +
+            `2️⃣ <b>Get your link:</b>\n` +
+            `Click "🔗 Get VPN Link" in this bot and copy the link.\n\n` +
+            `3️⃣ <b>Connect:</b>\n` +
+            `Open the app, add the configuration (usually via the "+" icon or "Import from Clipboard"), and press "Connect".\n\n` +
+            `🤝 <b>Support:</b>\n` +
+            `If you have any questions, contact <a href="https://t.me/${adminUsername}">the administrator</a>.`,
     },
 };
 

@@ -4,7 +4,7 @@ import { XUIClient } from "./xui.js";
 
 import fs from "fs";
 import { getUserLocale, labels, strings } from "./i18n.js";
-import { PLANS } from "./Pricing/pricingConfig.js";
+import { PLANS, pricingConfig } from "./Pricing/pricingConfig.js";
 import { adminUsername } from "./constants.js";
 
 const USERS_FILE = "./users.json";
@@ -83,19 +83,35 @@ bot.action("buy_trial", async (ctx) => {
 // Логика покупки МЕСЯЦА (здесь обычно добавляется ссылка на оплату)
 bot.action("buy_monthly", async (ctx) => {
     await ctx.answerCbQuery();
+    const locale = getUserLocale(ctx);
 
-    const priceInStars = 1; // Укажите цену в звездах
+    const invoiceStrings = {
+        ru: {
+            title: "Tiina VPN: 30 дней",
+            description: "Доступ к VPN на 30 дней.",
+            label: "Доступ на 30 дней",
+        },
+        en: {
+            title: "Tiina VPN: 30 Days",
+            description: "VPN access for 30 days.",
+            label: "30-day access",
+        },
+    };
 
     await ctx.replyWithInvoice({
-        title: "Tiina VPN: 1 Month",
-        description: "Subscription for 30 days of high-speed VLESS VPN access.",
-        payload: "month_subscription", // Технический идентификатор
-        provider_token: "", // Для Stars всегда пустая строка
+        title: invoiceStrings[locale].title,
+        description: invoiceStrings[locale].description,
+        payload: "month_subscription",
+        provider_token: "",
         currency: "XTR",
-        prices: [{ label: "1 Month Subscription", amount: priceInStars }],
+        prices: [
+            {
+                label: invoiceStrings[locale].label,
+                amount: pricingConfig.starsPrice,
+            },
+        ],
     });
 });
-
 bot.on("pre_checkout_query", async (ctx) => {
     // Здесь можно еще раз проверить наличие свободных мест на сервере
     await ctx.answerPreCheckoutQuery(true);
@@ -136,11 +152,7 @@ const formatTraffic = (bytes: number) => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 };
 
-const escapeMarkdown = (text: string) => {
-    return text.replace(/([_*\[\]()~`>#+\-=|{}.!])/g, "\\$1");
-};
-
-// Функция получения инфо (общая для команды и кнопки)
+// getUserInfo func
 async function getUserInfo(tgId: number, locale: "ru" | "en") {
     const user = await xuiClient.findUserByTelegramId(tgId);
     if (!user) return { error: strings[locale].noActiveSub };
@@ -150,7 +162,6 @@ async function getUserInfo(tgId: number, locale: "ru" | "en") {
     const isExpired = client.expiryTime > 0 && client.expiryTime < now;
     const stats = await xuiClient.getClientStats(client.email);
 
-    // Форматируем дату в зависимости от локали
     const dateLocale = locale === "ru" ? "ru-RU" : "en-US";
     const expiryDate =
         client.expiryTime > 0
@@ -170,24 +181,24 @@ async function getUserInfo(tgId: number, locale: "ru" | "en") {
 }
 
 // Функция получения ссылки (общая)
-async function getConnectionLink(tgId: number) {
+async function getConnectionLink(tgId: number, locale: "ru" | "en") {
     const user = await xuiClient.findUserByTelegramId(tgId);
-    if (!user) return { error: "❌ Subscription not found. Use /subscribe" };
+
+    if (!user) return { error: strings[locale].noSubFound };
 
     const { client, inbound } = user;
     if (client.expiryTime > 0 && client.expiryTime < Date.now()) {
-        return { error: "❌ Your subscription has expired." };
+        return { error: strings[locale].subExpired };
     }
 
     const baseUrl = new URL(process.env.XUI_BASE_URL!);
     const host = baseUrl.hostname;
-    const inboundName = encodeURIComponent(inbound.remark || inbound.tag || "XUI_VPN");
+
+    const inboundName = encodeURIComponent(inbound.remark || inbound.tag || "Tiina_VPN");
+
     const link = `vless://${client.id}@${host}:${inbound.port}?encryption=none&security=none&type=tcp#${inboundName}`;
 
-    const text =
-        `🔗 <b>Your connection link:</b>\n\n` +
-        `<code>${link}</code>\n\n` +
-        `<i>Tap the link above to copy it.</i>`;
+    const text = strings[locale].connectionLinkHeader.replace("{link}", link);
 
     return { text };
 }
@@ -298,7 +309,9 @@ bot.command("info", async (ctx) => {
 });
 
 bot.command("get", async (ctx) => {
-    const res = await getConnectionLink(ctx.from.id);
+    const locale = getUserLocale(ctx);
+
+    const res = await getConnectionLink(ctx.from.id, locale);
     await ctx.reply(res.text || res.error!, { parse_mode: "HTML" });
 });
 
@@ -314,17 +327,17 @@ bot.hears([labels.ru.status, labels.en.status], async (ctx) => {
 
 // Кнопка Ссылки
 bot.hears([labels.ru.link, labels.en.link], async (ctx) => {
-    const res = await getConnectionLink(ctx.from.id);
+    const locale = getUserLocale(ctx);
 
-    // Если произошла ошибка (например, нет подписки), просто выводим текст ошибки
+    const res = await getConnectionLink(ctx.from.id, locale);
+
     if (res.error) {
         return ctx.reply(res.error, { parse_mode: "HTML" });
     }
 
-    // Если ссылка получена, добавляем к сообщению кнопку "How to start"
     await ctx.reply(res.text!, {
         parse_mode: "HTML",
-        ...Markup.inlineKeyboard([[Markup.button.callback("❓ How to start use", "btn_help_sub")]]),
+        ...Markup.inlineKeyboard([[Markup.button.callback(labels[locale].help, "btn_help_sub")]]),
     });
 });
 
@@ -332,26 +345,14 @@ bot.hears([labels.ru.help, labels.en.help], async (ctx) => {
     await sendHelp(ctx);
 });
 
-// 2. ДОБАВЛЯЕМ обработчик для Inline-кнопки (которая под ссылкой)
 bot.action("btn_help_sub", async (ctx) => {
-    await ctx.answerCbQuery(); // Обязательно, чтобы убрать "часики" на кнопке
+    await ctx.answerCbQuery();
     await sendHelp(ctx);
 });
 
-// 3. Выносим текст помощи в отдельную функцию, чтобы не дублировать код
-async function sendHelp(ctx: Context) {
-    const helpText =
-        `<b>How to get started:</b>\n\n` +
-        `1️⃣ <b>Install the app (Happ Proxy):</b>\n` +
-        `• <a href="https://play.google.com/store/apps/details?id=com.happproxy">Download for Android</a>\n` +
-        `• <a href="https://apps.apple.com/ru/app/happ-proxy-utility-plus/id6746188973">Download for iOS (Russia)</a>\n` +
-        `• <a href="https://apps.apple.com/us/app/happ-proxy-utility/id6504287215">Download for iOS (Global)</a>\n\n` +
-        `2️⃣ <b>Get your link:</b>\n` +
-        `Click "🔗 Get VPN Link" in this bot and copy the link.\n\n` +
-        `3️⃣ <b>Connect:</b>\n` +
-        `Open the app, add the configuration (usually via the "+" icon or "Import from Clipboard"), and press "Connect".\n\n` +
-        `🤝 <b>Support:</b>\n` +
-        `If you have any questions, contact <a href="https://t.me/Tiina_Support">the administrator</a>.`;
+async function sendHelp(ctx: any) {
+    const locale = getUserLocale(ctx);
+    const helpText = strings[locale].helpText;
 
     await ctx.reply(helpText, {
         parse_mode: "HTML",
