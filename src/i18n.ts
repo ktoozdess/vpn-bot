@@ -1,5 +1,5 @@
-import { adminUsername } from "./constants";
-import { pricingConfig } from "./Pricing/pricingConfig";
+import { adminUsername } from "./constants.js";
+import { pricingConfig } from "./Pricing/pricingConfig.js";
 
 export const labels = {
     ru: {
