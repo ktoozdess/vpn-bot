@@ -21,3 +21,4 @@ services:
             - "30001:30001"
         volumes:
             - /root/3xui/data:/etc/x-ui
+            - /etc/letsencrypt:/etc/letsencrypt:ro
