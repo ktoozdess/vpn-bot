@@ -191,12 +191,43 @@ async function getConnectionLink(tgId: number, locale: "ru" | "en") {
         return { error: strings[locale].subExpired };
     }
 
+    // Парсим настройки стрима
+    const streamSettings =
+        typeof inbound.streamSettings === "string"
+            ? JSON.parse(inbound.streamSettings)
+            : inbound.streamSettings;
+
+    const security = streamSettings.security || "none";
+    const transport = streamSettings.network || "tcp";
+
     const baseUrl = new URL(process.env.XUI_BASE_URL!);
     const host = baseUrl.hostname;
 
     const inboundName = encodeURIComponent(inbound.remark || inbound.tag || "Tiina_VPN");
 
-    const link = `vless://${client.id}@${host}:${inbound.port}?encryption=none&security=none&type=tcp#${inboundName}`;
+    const params = new URLSearchParams({
+        type: transport,
+        encryption: "none",
+        security: security,
+    });
+
+    // Настройки для TLS
+    if (security === "tls") {
+        const tlsSettings = streamSettings.tlsSettings;
+
+        const sni = tlsSettings?.serverName || host;
+        const cleanSni = sni.replace(/^https?:\/\//, "").split("/")[0];
+        params.append("sni", cleanSni);
+
+        const fp = tlsSettings?.settings?.utls || "chrome";
+        params.append("fp", fp);
+
+        if (tlsSettings?.alpn && tlsSettings.alpn.length > 0) {
+            params.append("alpn", tlsSettings.alpn.join(","));
+        }
+    }
+
+    const link = `vless://${client.id}@${host}:${inbound.port}?${params.toString()}#${inboundName}`;
 
     const text = strings[locale].connectionLinkHeader.replace("{link}", link);
 
