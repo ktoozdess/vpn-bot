@@ -18,7 +18,8 @@ services:
         restart: unless-stopped
         ports:
             - "2053:2053"
-            - "30001:30001"
+            - "30001:30001/tcp"
+            - "30001:30001/udp"
         volumes:
             - /root/3xui/data:/etc/x-ui
             - /etc/letsencrypt:/etc/letsencrypt:ro
