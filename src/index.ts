@@ -205,6 +205,13 @@ async function getConnectionLink(tgId: number, locale: "ru" | "en") {
 
     const inboundName = encodeURIComponent(inbound.remark || inbound.tag || "Tiina_VPN");
 
+    const cleanedDomain = streamSettings.tlsSettings?.serverName
+        .replace(/^https?:\/\//, "")
+        .split("/")[0];
+    const connectionHost = cleanedDomain || host;
+
+    console.log(cleanedDomain, connectionHost);
+
     const params = new URLSearchParams({
         type: transport,
         encryption: "none",
@@ -227,7 +234,7 @@ async function getConnectionLink(tgId: number, locale: "ru" | "en") {
         }
     }
 
-    const link = `vless://${client.id}@${host}:${inbound.port}?${params.toString()}#${inboundName}`;
+    const link = `vless://${client.id}@${connectionHost}:${inbound.port}?${params.toString()}#${inboundName}`;
 
     const text = strings[locale].connectionLinkHeader.replace("{link}", link);
 
