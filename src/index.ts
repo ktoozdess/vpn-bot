@@ -210,8 +210,6 @@ async function getConnectionLink(tgId: number, locale: "ru" | "en") {
         .split("/")[0];
     const connectionHost = cleanedDomain || host;
 
-    console.log(cleanedDomain, connectionHost);
-
     const params = new URLSearchParams({
         type: transport,
         encryption: "none",
