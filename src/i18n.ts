@@ -61,7 +61,7 @@ export const strings = {
             `🔼 Отправлено: <code>${up}</code>\n` +
             `🔽 Загружено: <code>${down}</code>\n\n` +
             `<i>Для продления используйте 💳 О подписке</i>`,
-        noSubFound: "❌ Подписка не найдена. Используйте /subscribe",
+        noSubFound: "❌ Подписка не найдена. Используйте 💳 О подписке",
         subExpired: "❌ Срок вашей подписки истек.",
         connectionLinkHeader:
             `🔗 <b>Ваша ссылка для подключения:</b>\n\n` +
@@ -122,7 +122,7 @@ export const strings = {
             `🔼 Uploaded: <code>${up}</code>\n` +
             `🔽 Downloaded: <code>${down}</code>\n\n` +
             `<i>To extend, use 💳 Subscription Info</i>`,
-        noSubFound: "❌ Subscription not found. Use /subscribe",
+        noSubFound: "❌ Subscription not found. 💳 Subscription Info",
         subExpired: "❌ Your subscription has expired.",
         connectionLinkHeader:
             `🔗 <b>Your connection link:</b>\n\n` +
